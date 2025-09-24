@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.venv/
+venv/
+.env
+
+# Local configs & secrets
+config.json
+*.local.json
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db

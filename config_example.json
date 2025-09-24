@@ -1,0 +1,18 @@
+{
+  "account_address": "0xYourPublicAddress",
+  "secret_key": "0xYourPrivateKeyHex",
+  "base_url": "",
+
+  "spot_symbol": "HYPE",
+  "spot_usdc": 12, 
+
+  "futures_symbol": "HYPE",
+  "futures_usdc": 12, 
+
+  "price_offset_ticks": 1,
+  "iterations": 2,
+  "delay_seconds": 2,
+  "monitor_orders": true
+}
+
+
