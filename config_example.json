@@ -1,18 +1,51 @@
 {
-  "account_address": "0xYourPublicAddress",
-  "secret_key": "0xYourPrivateKeyHex",
-  "base_url": "",
-
-  "spot_symbol": "HYPE",
-  "spot_usdc": 12, 
-
-  "futures_symbol": "HYPE",
-  "futures_usdc": 12, 
-
-  "price_offset_ticks": 1,
-  "iterations": 2,
-  "delay_seconds": 2,
-  "monitor_orders": true
+  "credentials": {
+    "account_address": "0xYourPublicAddress",
+    "secret_key": "0xYourPrivateKeyHex",
+    "base_url": "https://api.hyperliquid.xyz"
+  },
+  "markets": {
+    "base": "HYPE",
+    "spot": "HYPE/USDC",
+    "perp": "HYPE"
+  },
+  "strategy": {
+    "enter_threshold_apr": 0.10,
+    "exit_threshold_apr": 0.04,
+    "target_usd_notional": 200.0,
+    "hedge_ratio": 1.0
+  },
+  "execution": {
+    "price_offset_ticks": 1,
+    "tif": "Gtc",
+    "post_only": false,
+    "reprice_interval_ms": 800,
+    "max_replaces_per_min": 20,
+    "hedge_repair_timeout_ms": 5000,
+    "hedge_repair_stage_ms": 1500,
+    "hedge_repair_tif": "Ioc"
+  },
+  "risk": {
+    "per_symbol_notional_cap": 500.0,
+    "portfolio_notional_cap": 2000.0,
+    "max_drawdown_usd": 50.0,
+    "min_spread_ticks": 1
+  },
+  "telemetry": {
+    "log_level": "INFO",
+    "metrics": true
+  },
+  "fees": {
+    "spot_maker": 0.0004,
+    "spot_taker": 0.0007,
+    "perp_maker": 0.00015,
+    "perp_taker": 0.00045
+  },
+  "alignment": {
+  "enabled": true,
+  "mode": "log",
+  "min_diff_quanta": 1
+  }
 }
 
 
