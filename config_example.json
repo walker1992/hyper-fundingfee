@@ -63,7 +63,11 @@
   },
   "telemetry": {
     "log_level": "INFO",
-    "metrics": true
+    "metrics": true,
+    "log_file": "logs/runner.log",
+    "log_max_bytes": 10485760,
+    "log_backup_count": 5,
+    "disable_console_logging": false
   },
   "fees": {
     "spot_maker": 0.0004,

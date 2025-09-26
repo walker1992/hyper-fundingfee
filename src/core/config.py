@@ -128,6 +128,11 @@ class RiskParams:
 class TelemetryParams:
     log_level: str = "INFO"
     metrics: bool = True
+    # Optional logging configuration (overridable by environment variables)
+    log_file: str | None = None
+    log_max_bytes: int | None = None
+    log_backup_count: int | None = None
+    disable_console_logging: bool | None = None
 
 
 @dataclass
@@ -218,7 +223,14 @@ def load_config(path: str) -> AppConfig:
             max_drawdown_usd=_to_decimal(risk["max_drawdown_usd"]),
             min_spread_ticks=int(risk["min_spread_ticks"]),
         ),
-        telemetry=TelemetryParams(log_level=str(tel.get("log_level", "INFO")), metrics=bool(tel.get("metrics", True))),
+        telemetry=TelemetryParams(
+            log_level=str(tel.get("log_level", "INFO")),
+            metrics=bool(tel.get("metrics", True)),
+            log_file=str(tel.get("log_file")) if tel.get("log_file") is not None else None,
+            log_max_bytes=int(tel.get("log_max_bytes")) if tel.get("log_max_bytes") is not None else None,
+            log_backup_count=int(tel.get("log_backup_count")) if tel.get("log_backup_count") is not None else None,
+            disable_console_logging=bool(tel.get("disable_console_logging")) if tel.get("disable_console_logging") is not None else None,
+        ),
         fees=FeesParams(
             spot_maker=_to_decimal(fees.get("spot_maker", 0.0004)),
             spot_taker=_to_decimal(fees.get("spot_taker", 0.0007)),

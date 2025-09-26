@@ -4,6 +4,9 @@ import argparse
 import sys
 import time
 import signal
+import os
+import logging
+from logging.handlers import RotatingFileHandler
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any, Optional
@@ -18,6 +21,73 @@ from src.exchanges.hyperliquid.hl_spot_adapter import HyperliquidSpotAdapter
 from src.risk.guardrails import DrawdownGuard
 from src.risk.limits import NotionalLimiter, OrderRateLimiter
 from src.strategy.funding_carry import FundingCarryStrategy, StrategyConfig
+from src.utils.logging_utils import setup_app_logger
+
+
+def _setup_rotating_file_logger(logger_name: str, level_str: str = "INFO", *,
+                                log_file: str | None = None,
+                                max_bytes: int | None = None,
+                                backup_count: int | None = None,
+                                disable_console: bool | None = None) -> dict:
+    log_file = os.environ.get("LOG_FILE", log_file or "logs/runner.log")
+    try:
+        log_dir = os.path.dirname(log_file)
+        if log_dir:
+            os.makedirs(log_dir, exist_ok=True)
+    except Exception:
+        pass
+    try:
+        level = getattr(logging, (level_str or "INFO").upper(), logging.INFO)
+    except Exception:
+        level = logging.INFO
+    mb = 10 * 1024 * 1024 if max_bytes is None else max_bytes
+    bc = 5 if backup_count is None else backup_count
+    try:
+        mb = int(os.environ.get("LOG_MAX_BYTES", str(mb)))
+    except Exception:
+        pass
+    try:
+        bc = int(os.environ.get("LOG_BACKUP_COUNT", str(bc)))
+    except Exception:
+        pass
+    env_disable = os.environ.get("DISABLE_CONSOLE_LOGGING")
+    if env_disable is not None:
+        disable_flag = (env_disable == "1")
+    else:
+        disable_flag = bool(disable_console) if disable_console is not None else False
+
+    logger = logging.getLogger(logger_name)
+    try:
+        logger.setLevel(level)
+    except Exception:
+        pass
+    try:
+        has_file = False
+        for h in list(logger.handlers):
+            if isinstance(h, RotatingFileHandler):
+                has_file = True
+            if disable_flag and isinstance(h, logging.StreamHandler):
+                try:
+                    logger.removeHandler(h)
+                except Exception:
+                    pass
+        if not has_file:
+            fh = RotatingFileHandler(log_file, maxBytes=mb, backupCount=bc, encoding="utf-8")
+            fh.setLevel(level)
+            fh.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+            logger.addHandler(fh)
+        logger.propagate = False
+    except Exception:
+        pass
+
+    return {
+        "log_file": log_file,
+        "max_bytes": mb,
+        "backup_count": bc,
+        "disable_console": disable_flag,
+        "level": level_str,
+    }
+
 
 class _FakeInfo:
     def __init__(self) -> None:
@@ -73,7 +143,32 @@ class StrategyRunner:
         self.cfg = cfg
         self.opts = opts
         self.clock = TimeProvider()
+        # Initialize JSON logger and attach rotating file handler via unified utils
         self.logger = JsonLogger(name="runner")
+        try:
+            level_str = None
+            try:
+                level_str = str(getattr(cfg.telemetry, "log_level", "INFO") or "INFO")
+            except Exception:
+                level_str = os.environ.get("LOG_LEVEL", "INFO")
+            meta = setup_app_logger(
+                "runner",
+                log_level=os.environ.get("LOG_LEVEL", level_str),
+                log_file=getattr(cfg.telemetry, "log_file", None),
+                log_max_bytes=getattr(cfg.telemetry, "log_max_bytes", None),
+                log_backup_count=getattr(cfg.telemetry, "log_backup_count", None),
+                disable_console_logging=getattr(cfg.telemetry, "disable_console_logging", None),
+            )
+            self.logger.info(
+                "log_init",
+                file=meta.get("file"),
+                level=meta.get("level"),
+                max_bytes=str(meta.get("max_bytes")),
+                backup_count=str(meta.get("backup_count")),
+                disable_console=bool(meta.get("disable_console")),
+            )
+        except Exception:
+            pass
         self.metrics = Metrics()
         self.state = StateStore(opts.state_db or ":memory:")
         self._stop = False

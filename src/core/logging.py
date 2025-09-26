@@ -18,8 +18,16 @@ class JsonLogger:
         self._logger.setLevel(self.level)
         if not self._logger.handlers:
             handler = logging.StreamHandler()
-            handler.setFormatter(logging.Formatter("%(message)s"))
+            handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
             self._logger.addHandler(handler)
+        else:
+            # Ensure existing stream handlers use consistent formatter
+            try:
+                for h in list(self._logger.handlers):
+                    if isinstance(h, logging.StreamHandler):
+                        h.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+            except Exception:
+                pass
         # Prevent duplicate logs via root logger
         self._logger.propagate = False
 
@@ -32,15 +40,27 @@ class JsonLogger:
             except TypeError:
                 return str(o)
 
+    def _format_value(self, value: Any) -> str:
+        if isinstance(value, Decimal):
+            return str(value)
+        if isinstance(value, (dict, list, tuple)):
+            try:
+                return json.dumps(value, ensure_ascii=False, separators=(",", ":"), cls=self._EnhancedJSONEncoder)
+            except Exception:
+                return str(value)
+        return str(value)
+
     def log(self, level: int, message: str, **fields: Any) -> None:
-        record: Dict[str, Any] = {
-            "ts": datetime.utcnow().isoformat(timespec="milliseconds") + "Z",
-            "lvl": logging.getLevelName(level),
-            "msg": message,
-        }
-        if fields:
-            record.update(fields)
-        self._logger.log(level, json.dumps(record, ensure_ascii=False, cls=self._EnhancedJSONEncoder))
+        # Plain key=value fields appended to message; timestamp and level come from formatter
+        try:
+            if fields:
+                extras = " ".join(f"{k}={self._format_value(v)}" for k, v in fields.items())
+                line = f"{message} {extras}"
+            else:
+                line = message
+        except Exception:
+            line = message
+        self._logger.log(level, line)
 
     def info(self, message: str, **fields: Any) -> None:
         self.log(logging.INFO, message, **fields)

@@ -1,0 +1,53 @@
+{
+  "_comments": {
+    "how_to_use": "请复制本文件为 config.json 并填写必要字段。config.json 已在 .gitignore 中忽略，请勿提交到版本库。",
+    "auth": "api_key/api_secret 为交易所后台创建的密钥，确保开通现货/合约交易权限与IP白名单",
+    "endpoints": "base_url 用于合约(期货)；spot_base_url 用于现货。若仅配置 base_url，期货脚本会使用它。",
+    "symbols": "symbol 为通用交易对；现货可单独配置 spot_symbol（可省略）",
+    "orders": "futures_usdt/spot_usdt 为下单名义金额(USDT)；price_offset_ticks 为挂单与盘口的跳 tick 偏移",
+    "precision": "*_tick_size/*_step_size 为价格与数量精度；可留空使用交易所 exchangeInfo 自动回退",
+    "timing": "recv_window_ms 建议 <= 5000；time_sync_interval_ms 为本地与服务器时间同步间隔，单位毫秒",
+    "run": "iterations/delay_seconds/monitor_orders 控制脚本循环次数、节奏与打印",
+    "note": "提交前请确认已正确填写 api_key/api_secret，并确保资金与权限充足，以避免 -2018 余额不足"
+  },
+
+  "api_key": "",
+  "api_secret": "",
+
+  "base_url": "https://fapi.asterdex.com",
+  "spot_base_url": "https://sapi.asterdex.com",
+
+  "symbol": "ASTERUSDT",
+  "spot_symbol": "ASTERUSDT",
+
+  "futures_usdt": "7",
+  "spot_usdt": "7",
+  "price_offset_ticks": 1,
+  "recv_window_ms": 5000,
+  "time_sync_interval_ms": 60000,
+
+  "futures_tick_size": "0.001",
+  "futures_step_size": "1",
+  "spot_tick_size": "0.01",
+  "spot_step_size": "0.001",
+
+  "iterations": 1,
+  "delay_seconds": 2,
+  "monitor_orders": true,
+
+  "position_size": 1000,
+  "max_leverage": 1,
+  "min_funding_rate": 0.0001,
+  "stop_loss_funding_rate": -0.0005,
+  "warning_funding_rate": 0.0001,
+  "check_interval": 300,
+  "max_unrealized_loss": 100,
+  "max_position_imbalance": 0.05,
+  "min_margin_ratio": 0.2,
+  "risk_check_interval": 60,
+  "trading_fee_rate": 0.0004,
+  "slippage_tolerance": 0.001,
+  "report_dir": "report",
+  "funding_history_size": 100,
+  "log_level": "INFO"
+}
