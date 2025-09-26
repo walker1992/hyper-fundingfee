@@ -1,4 +1,31 @@
 {
+  "_comments": {
+    "credentials": "Account address and private key for signing; base_url is API endpoint (mainnet/testnet)",
+    "markets": "base = underlying asset symbol; spot = BASE/QUOTE pair; perp = BASE perpetual",
+    "strategy.enter_threshold_apr": "Enter when expected funding APR is >= this threshold",
+    "strategy.exit_threshold_apr": "Exit when expected funding APR is <= this threshold",
+    "strategy.target_usd_notional": "Target USD notional per entry cycle across legs",
+    "strategy.hedge_ratio": "Spot:Perp size ratio. 1.0 means equal notional",
+    "execution.price_offset_ticks": "Quote offset in ticks from best price when placing passive orders",
+    "execution.tif": "Time-in-force for normal orders (e.g., Gtc, Ioc)",
+    "execution.post_only": "Whether to enforce maker-only for normal orders",
+    "execution.reprice_interval_ms": "Main loop price refresh cadence (also throttles entries)",
+    "execution.max_replaces_per_min": "Order updates per minute cap (rate limiter)",
+    "execution.hedge_repair_timeout_ms": "Max duration to attempt completing the missing leg before unwinding",
+    "execution.hedge_repair_stage_ms": "Stage boundary to switch from normal TIF to aggressive TIF",
+    "execution.hedge_repair_tif": "Aggressive TIF used in repair stage (default Ioc)",
+    "execution.perp_leverage": "Desired perp leverage, applied via exchange.update_leverage",
+    "execution.perp_cross": "true = cross margin, false = isolated (if supported)",
+    "risk.per_symbol_notional_cap": "Per-symbol notional exposure limit (USD)",
+    "risk.portfolio_notional_cap": "Aggregate notional exposure cap (USD)",
+    "risk.max_drawdown_usd": "Stop trading if realized drawdown exceeds this",
+    "risk.min_spread_ticks": "Require at least this many ticks between spot/perp mid for entry",
+    "fees": "Estimated fee rates for spot/perp maker/taker (used for PnL/fees accounting)",
+    "telemetry": "Logging level and metrics toggle",
+    "alignment.enabled": "Enable periodic reconciliation with venue state",
+    "alignment.mode": "log = only log diffs; force = overwrite local sizes (and perp cost via entryPx)",
+    "alignment.min_diff_quanta": "Only reconcile if size diff >= this many minimum quantums"
+  },
   "credentials": {
     "account_address": "0xYourPublicAddress",
     "secret_key": "0xYourPrivateKeyHex",
@@ -12,6 +39,7 @@
   "strategy": {
     "enter_threshold_apr": 0.10,
     "exit_threshold_apr": 0.04,
+    "enter_exit_cooldown_s": 60,
     "target_usd_notional": 200.0,
     "hedge_ratio": 1.0
   },
@@ -23,7 +51,9 @@
     "max_replaces_per_min": 20,
     "hedge_repair_timeout_ms": 5000,
     "hedge_repair_stage_ms": 1500,
-    "hedge_repair_tif": "Ioc"
+    "hedge_repair_tif": "Ioc",
+    "perp_leverage": 1,
+    "perp_cross": true
   },
   "risk": {
     "per_symbol_notional_cap": 500.0,

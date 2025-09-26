@@ -133,6 +133,11 @@ class StrategyRunner:
         self.exit_in_progress = False
         self.last_exit_ts = 0.0
         self.last_flat_ts = 0.0
+        # Global cooldown after enter/exit
+        try:
+            self.enter_exit_cooldown_s = int(self.cfg.execution.enter_exit_cooldown_s or 300)
+        except Exception:
+            self.enter_exit_cooldown_s = 300
         # Hedge repair state
         self.repair_active = False
         self.repair_start_ts = 0.0
@@ -141,11 +146,79 @@ class StrategyRunner:
         self.repair_cancel_done = False
         self.last_spot_entry_oid: Optional[int] = None
 
+        # Print basic markets and leverage info
+        try:
+            base = cfg.markets["base"]
+            spot_sym = cfg.markets["spot"]
+            perp_sym = cfg.markets["perp"]
+            # Read current leverage from user_state if available
+            lev = None
+            try:
+                u = self.perp.get_positions()
+                if isinstance(u, dict):
+                    for it in (u.get("assetPositions") or []):
+                        pos = (it or {}).get("position", {})
+                        if str(pos.get("coin")) == perp_sym:
+                            lev = pos.get("leverage")
+                            break
+            except Exception:
+                lev = None
+            self.logger.info(
+                "markets_info",
+                base=base,
+                spot=spot_sym,
+                perp=perp_sym,
+                leverage=lev,
+                desired_perp_leverage=int(self.cfg.execution.perp_leverage or 1),
+                desired_perp_cross=bool(self.cfg.execution.perp_cross if self.cfg.execution.perp_cross is not None else True),
+            )
+        except Exception:
+            pass
+
+    def _apply_and_log_leverage(self) -> None:
+        # Attempt to apply configured leverage and log the result; tolerant of SDK differences
+        try:
+            desired_lev = int(self.cfg.execution.perp_leverage or 1)
+            use_cross = bool(self.cfg.execution.perp_cross if self.cfg.execution.perp_cross is not None else True)
+            resp = None
+            if hasattr(self.perp.exchange, "update_leverage"):
+                try:
+                    if use_cross:
+                        resp = self.perp.exchange.update_leverage(desired_lev, self.cfg.markets["perp"])  # type: ignore
+                    else:
+                        resp = self.perp.exchange.update_leverage(desired_lev, self.cfg.markets["perp"], False)  # type: ignore
+                except Exception:
+                    try:
+                        resp = self.perp.exchange.update_leverage(desired_lev)  # type: ignore
+                    except Exception:
+                        resp = None
+            self.logger.info(
+                "leverage_update_attempt",
+                desired_perp_leverage=desired_lev,
+                desired_perp_cross=use_cross,
+                response=resp,
+            )
+        except Exception:
+            pass
+        # Snapshot leverage after attempt
+        try:
+            lev = None
+            u = self.perp.get_positions()
+            if isinstance(u, dict):
+                for it in (u.get("assetPositions") or []):
+                    pos = (it or {}).get("position", {})
+                    if str(pos.get("coin")) == self.cfg.markets["perp"]:
+                        lev = pos.get("leverage")
+                        break
+            self.logger.info("leverage_snapshot", symbol=self.cfg.markets["perp"], leverage=lev)
+        except Exception:
+            pass
+
         # Alignment controls from config
         try:
-            self.align_enabled = bool(cfg.alignment.enabled)
-            self.align_mode = str(cfg.alignment.mode or "log")
-            self.align_min_diff_quanta = int(cfg.alignment.min_diff_quanta or 1)
+            self.align_enabled = bool(self.cfg.alignment.enabled)
+            self.align_mode = str(self.cfg.alignment.mode or "log")
+            self.align_min_diff_quanta = int(self.cfg.alignment.min_diff_quanta or 1)
         except Exception:
             self.align_enabled = True
             self.align_mode = "log"
@@ -165,6 +238,23 @@ class StrategyRunner:
         except Exception:
             pass
         return Decimal("0")
+
+    def _read_perp_position_detail(self) -> tuple[Decimal, Optional[Decimal]]:
+        try:
+            data = self.perp.get_positions()
+            if isinstance(data, dict):
+                assets = data.get("assetPositions") or []
+                for it in assets:
+                    pos = (it or {}).get("position", {})
+                    if str(pos.get("coin")) == self.cfg.markets["perp"]:
+                        from decimal import Decimal as _D
+                        szi = _D(str(pos.get("szi", "0")).replace("+", ""))
+                        entry_px = pos.get("entryPx")
+                        entry_px_d = _D(str(entry_px)) if entry_px is not None else None
+                        return szi, entry_px_d
+        except Exception:
+            pass
+        return Decimal("0"), None
 
     def _has_exposure(self) -> bool:
         try:
@@ -233,12 +323,17 @@ class StrategyRunner:
                         f = s["filled"]
                         filled_sz = Decimal(str(f.get("totalSz", "0")))
                         avg_px = Decimal(str(f.get("avgPx", "0")))
-                        if filled_sz > 0 and self.sz_perp > 0:
-                            use_sz = min(filled_sz, self.sz_perp)
-                            entry_avg = (self.cost_perp_usd / self.sz_perp) if self.sz_perp > 0 else Decimal("0")
-                            self.realized_pnl_perp += (entry_avg - avg_px) * use_sz
-                            self.cost_perp_usd -= entry_avg * use_sz
-                            self.sz_perp -= use_sz
+                        if filled_sz > 0:
+                            # Determine effective open size and entry price baseline
+                            venue_szi, venue_entry = self._read_perp_position_detail()
+                            local_open_sz = self.sz_perp if self.sz_perp > 0 else (abs(venue_szi) if venue_szi < 0 else Decimal("0"))
+                            use_sz = min(filled_sz, local_open_sz) if local_open_sz > 0 else Decimal("0")
+                            entry_avg = (self.cost_perp_usd / self.sz_perp) if (self.sz_perp > 0 and self.cost_perp_usd > 0) else (venue_entry or Decimal("0"))
+                            if use_sz > 0 and entry_avg > 0:
+                                self.realized_pnl_perp += (entry_avg - avg_px) * use_sz
+                                if self.sz_perp > 0:
+                                    self.cost_perp_usd -= entry_avg * use_sz
+                                    self.sz_perp -= use_sz
                             # Closing fee accounting (assume taker unless we observed resting)
                             try:
                                 was_maker = any(isinstance(ss, dict) and "resting" in ss for ss in statuses)
@@ -501,6 +596,12 @@ class StrategyRunner:
             # Only act if we have exposure; otherwise ignore and don't log
             if not self._has_exposure():
                 return
+            # Enforce cooldown after last enter or last exit
+            import time as _t
+            if self.last_entry_ts and (_t.time() - self.last_entry_ts) < self.enter_exit_cooldown_s:
+                return
+            if self.last_exit_ts and (_t.time() - self.last_exit_ts) < self.enter_exit_cooldown_s:
+                return
             # Avoid repeated exit spam: only run once per short window
             import time as _t
             now = _t.time()
@@ -519,10 +620,15 @@ class StrategyRunner:
             return
         # Enter cooldown: after flatting, wait a short cooldown to avoid churn
         import time as _t
-        if self.last_flat_ts and (_t.time() - self.last_flat_ts) < 5.0:
+        if self.last_flat_ts and (_t.time() - self.last_flat_ts) < self.enter_exit_cooldown_s:
+            return
+        # Also enforce cooldown since last exit
+        if self.last_exit_ts and (_t.time() - self.last_exit_ts) < self.enter_exit_cooldown_s:
             return
         if not self._risk_ok():
             return
+
+        # Leverage is applied once at startup in _apply_and_log_leverage()
 
         res = self.strategy.evaluate_and_place()
         if res.get("entered"):
@@ -861,6 +967,12 @@ class StrategyRunner:
         signal.signal(signal.SIGINT, _sigint)
 
                 # Snapshot account state for traceability
+        # Apply leverage per config before snapshotting state
+        try:
+            self._apply_and_log_leverage()
+        except Exception:
+            pass
+        
         try:
             balances_spot = self.spot.get_balances()
         except Exception:
@@ -876,7 +988,18 @@ class StrategyRunner:
             }
         except Exception:
             open_orders = None
-        self.logger.info("pre_trade_state", balances_spot=balances_spot, positions_perp=positions_perp, open_orders=open_orders)
+        # Also print current leverage snapshot at startup
+        lev = None
+        try:
+            if isinstance(positions_perp, dict):
+                for it in (positions_perp.get("assetPositions") or []):
+                    pos = (it or {}).get("position", {})
+                    if str(pos.get("coin")) == self.cfg.markets["perp"]:
+                        lev = pos.get("leverage")
+                        break
+        except Exception:
+            lev = None
+        self.logger.info("pre_trade_state", balances_spot=balances_spot, positions_perp=positions_perp, open_orders=open_orders, leverage=lev)
         try:
             if self.opts.once:
                 self.step()

@@ -83,9 +83,12 @@ Copy `config_example.json` to `config.json`, then edit:
   - `hedge_repair_timeout_ms` (default 5000)
   - `hedge_repair_stage_ms` (default 1500)
   - `hedge_repair_tif` (default `Ioc`)
+  - `perp_leverage` (default 1): desired leverage applied via exchange API
+  - `perp_cross` (default true): cross margin (true) vs isolated (false)
 - `risk`: `{ per_symbol_notional_cap, portfolio_notional_cap, max_drawdown_usd, min_spread_ticks }`
 - `fees`: `{ spot_maker, spot_taker, perp_maker, perp_taker }`
 - `telemetry`: `{ log_level, metrics }`
+ - `alignment`: `{ enabled, mode: log|force, min_diff_quanta }`
 
 ## Usage
 

@@ -109,6 +109,11 @@ class ExecutionParams:
     hedge_repair_timeout_ms: int | None = 5000
     hedge_repair_stage_ms: int | None = 1500
     hedge_repair_tif: str | None = "Ioc"
+    # Perp leverage controls
+    perp_leverage: int | None = 1
+    perp_cross: bool | None = True
+    # Global cooldown after each enter/exit (seconds)
+    enter_exit_cooldown_s: int | None = 300
 
 
 @dataclass
@@ -203,6 +208,9 @@ def load_config(path: str) -> AppConfig:
             hedge_repair_timeout_ms=int(exe.get("hedge_repair_timeout_ms", 5000)),
             hedge_repair_stage_ms=int(exe.get("hedge_repair_stage_ms", 1500)),
             hedge_repair_tif=str(exe.get("hedge_repair_tif", "Ioc")),
+            perp_leverage=int(exe.get("perp_leverage", 1)),
+            perp_cross=bool(exe.get("perp_cross", True)),
+            enter_exit_cooldown_s=int(exe.get("enter_exit_cooldown_s", 300)),
         ),
         risk=RiskParams(
             per_symbol_notional_cap=_to_decimal(risk["per_symbol_notional_cap"]),
@@ -236,6 +244,7 @@ def _validate(cfg: AppConfig) -> None:
     assert cfg.execution.price_offset_ticks >= 0
     assert cfg.risk.min_spread_ticks >= 0
     assert cfg.alignment.mode in ("log", "force"), "alignment.mode must be 'log' or 'force'"
+    assert (cfg.execution.perp_leverage or 1) >= 1
 
 
 def _coerce_legacy_schema(raw: dict) -> dict:
