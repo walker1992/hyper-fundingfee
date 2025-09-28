@@ -1109,6 +1109,7 @@ class StrategyRunner:
         finally:
             try:
                 self.shutdown()
+                self.logger.info("shutdown")
             finally:
                 signal.signal(signal.SIGINT, old)
 
