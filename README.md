@@ -10,14 +10,10 @@ This repository includes a production runner that executes a spot/perp funding-c
 ## Requirements
 
 - Python 3.10+
-- Packages:
-  - hyperliquid-python-sdk
-  - eth-account
-
-Install:
+- Install dependencies:
 
 ```bash
-pip install hyperliquid-python-sdk eth-account
+pip install -r requirements.txt
 ```
 
 ## Architecture
@@ -89,6 +85,23 @@ Copy `config_example.json` to `config.json`, then edit:
 - `fees`: `{ spot_maker, spot_taker, perp_maker, perp_taker }`
 - `telemetry`: `{ log_level, metrics }`
  - `alignment`: `{ enabled, mode: log|force, min_diff_quanta }`
+
+### Start/Stop scripts
+
+Convenience scripts are provided at the repo root:
+
+```bash
+./start.sh   # runs python -m src.app.runner in the background, logs to logs/service.out
+./stop.sh    # stops the background process using quantify.pid
+```
+
+### Discover supported markets
+
+List all supported spot/perp markets from Hyperliquid:
+
+```bash
+python3 -m src.tools.list_markets [--base-url https://api.hyperliquid.xyz] [--json]
+```
 
 ## Usage
 
