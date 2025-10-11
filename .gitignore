@@ -15,6 +15,7 @@ config.json
 # Logs
 *.log
 *.out
+*.pid
 
 # OS files
 .DS_Store
