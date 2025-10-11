@@ -1057,9 +1057,14 @@ class StrategyRunner:
     def run(self) -> None:
         def _sigint(_signum, _frame):
             self.request_stop()
+        
+        def _sigterm(_signum, _frame):
+            self.request_stop()
 
-        old = signal.getsignal(signal.SIGINT)
+        old_sigint = signal.getsignal(signal.SIGINT)
+        old_sigterm = signal.getsignal(signal.SIGTERM)
         signal.signal(signal.SIGINT, _sigint)
+        signal.signal(signal.SIGTERM, _sigterm)
 
                 # Snapshot account state for traceability
         # Apply leverage per config before snapshotting state
@@ -1111,7 +1116,8 @@ class StrategyRunner:
                 self.shutdown()
                 self.logger.info("shutdown")
             finally:
-                signal.signal(signal.SIGINT, old)
+                signal.signal(signal.SIGINT, old_sigint)
+                signal.signal(signal.SIGTERM, old_sigterm)
 
 
 def main(argv: Optional[list[str]] = None) -> int:

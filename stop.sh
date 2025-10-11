@@ -11,11 +11,12 @@ fi
 
 PID=$(cat "$PID_FILE")
 if kill -0 "$PID" >/dev/null 2>&1; then
-  kill "$PID" || true
-  # give it a moment to exit gracefully
-  sleep 1
+  echo "Sending SIGTERM to process $PID for graceful shutdown"
+  kill -TERM "$PID" || true
+  # give it time to execute shutdown gracefully
+  sleep 5
   if kill -0 "$PID" >/dev/null 2>&1; then
-    echo "Process $PID still running, sending SIGKILL"
+    echo "Process $PID still running after SIGTERM, sending SIGKILL"
     kill -9 "$PID" || true
   fi
   echo "Stopped service (PID: $PID)"
